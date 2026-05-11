@@ -1,0 +1,4 @@
+newman run postman/collection.json \
+  -e postman/env.ci.json \
+  --reporters cli,junit,htmlextra \
+  --suppress-exit-code
