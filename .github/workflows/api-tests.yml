@@ -1,0 +1,57 @@
+name: API Tests — DummyJSON
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  newman:
+    name: Run Postman Collection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Newman + HTML reporter
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Prepare CI environment
+        run: |
+          # DummyJSON нь auth шаардахгүй endpoint-д token хэрэггүй
+          # Token-г CI-д хэрэглэхгүй тул placeholder ашиглана
+          echo "Environment бэлэн болсон"
+          cat postman/env.ci.json
+
+      - name: Run Newman tests
+        run: |
+          newman run postman/collection.json \
+            -e postman/env.ci.json \
+            --reporters cli,junit,htmlextra \
+            --reporter-junit-export reports/api.xml \
+            --reporter-htmlextra-export reports/api.html \
+            --reporter-htmlextra-title "DummyJSON API Tests — BD14" \
+            --reporter-htmlextra-logs \
+            --timeout-request 10000
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-report
+          path: reports/
+          retention-days: 7
+
+      - name: Upload JUnit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-results
+          path: reports/api.xml

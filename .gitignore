@@ -1,0 +1,4 @@
+node_modules/
+postman/env.dev.local.json
+*.local.json
+.env

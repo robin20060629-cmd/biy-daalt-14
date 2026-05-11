@@ -1,0 +1,503 @@
+{
+  "info": {
+    "name": "Ovog — DummyJSON API",
+    "_postman_id": "bd14-dummyjson-collection",
+    "description": "F.CSM311 Бие даалт 14 — DummyJSON API тест collection. Login→Token chain, CRUD, error cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Login болон токен ашиглан профайл авах",
+      "item": [
+        {
+          "name": "Login — Token авах",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"emilys\",\n  \"password\": \"emilyspass\",\n  \"expiresInMins\": 60\n}"
+            },
+            "description": "Хэрэглэгч нэвтэрч JWT token авна. Token-г environment-д хадгалж chain хийнэ."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Login-ийн өмнө environment цэвэрлэх",
+                  "pm.environment.unset('token');",
+                  "pm.environment.unset('userId');",
+                  "console.log('Login request эхлэж байна — ' + new Date().toISOString());"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('Response < 2s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type нь JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});",
+                  "",
+                  "pm.test('Token болон userId байна', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('accessToken');",
+                  "  pm.expect(json).to.have.property('id');",
+                  "  pm.expect(json.accessToken).to.be.a('string').and.have.length.above(10);",
+                  "});",
+                  "",
+                  "// Chain: token болон userId-г environment-д хадгалах",
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.environment.set('token', json.accessToken);",
+                  "  pm.environment.set('userId', json.id);",
+                  "  console.log('Token хадгалагдлаа, userId: ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Profile — Token chain",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] },
+            "description": "Login-аас авсан {{token}}-г ашиглан профайл авна. Chain жишээ."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('Response < 1s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('Profile schema зөв', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('id');",
+                  "  pm.expect(d).to.have.property('username');",
+                  "  pm.expect(d).to.have.property('email');",
+                  "  pm.expect(d.id).to.be.a('number');",
+                  "  pm.expect(d.email).to.match(/@/);",
+                  "});",
+                  "",
+                  "pm.test('UserId login-тай тохирч байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  const savedId = parseInt(pm.environment.get('userId'));",
+                  "  pm.expect(d.id).to.eql(savedId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Products — Happy Path",
+      "description": "Бүтээгдэхүүний амжилттай CRUD операцууд",
+      "item": [
+        {
+          "name": "GET All Products (Happy GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?limit=10&skip=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "skip", "value": "0" }
+              ]
+            },
+            "description": "Бүтээгдэхүүн жагсаалт авна. Pagination шалгана."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Pagination параметр динамикаар тохируулах",
+                  "const limit = 10;",
+                  "const skip = 0;",
+                  "pm.environment.set('currentLimit', limit);",
+                  "pm.environment.set('currentSkip', skip);",
+                  "console.log(`Pagination: limit=${limit}, skip=${skip}`);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('Response < 2s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});",
+                  "",
+                  "pm.test('Products array байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('products');",
+                  "  pm.expect(d.products).to.be.an('array');",
+                  "  pm.expect(d.products.length).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Pagination metadata байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('total');",
+                  "  pm.expect(d).to.have.property('limit');",
+                  "  pm.expect(d).to.have.property('skip');",
+                  "  pm.expect(d.total).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('Product бүр шаардлагатай талбартай', () => {",
+                  "  const d = pm.response.json();",
+                  "  const p = d.products[0];",
+                  "  pm.expect(p).to.have.property('id');",
+                  "  pm.expect(p).to.have.property('title');",
+                  "  pm.expect(p).to.have.property('price');",
+                  "  pm.expect(p.price).to.be.a('number').and.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type нь JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}"]
+            },
+            "description": "ID-аар нэг бүтээгдэхүүн авна."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('Response < 1s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('Product schema зөв', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('id');",
+                  "  pm.expect(d).to.have.property('title');",
+                  "  pm.expect(d).to.have.property('price');",
+                  "  pm.expect(d).to.have.property('category');",
+                  "  pm.expect(d.id).to.be.a('number');",
+                  "  pm.expect(d.title).to.be.a('string').and.have.length.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Price эерэг тоо байна (бизнес дүрэм)', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.price).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type нь JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Create Product",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/products/add", "host": ["{{baseUrl}}"], "path": ["products", "add"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Product {{$randomInt}}\",\n  \"price\": 29.99,\n  \"category\": \"test\",\n  \"description\": \"Тест бүтээгдэхүүн\",\n  \"rating\": 4.5\n}"
+            },
+            "description": "Шинэ бүтээгдэхүүн үүсгэнэ. 201 + шинэ id буцаах ёстой."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Random product нэр үүсгэх",
+                  "const adjectives = ['Awesome', 'Super', 'Cool', 'Fast', 'Smart'];",
+                  "const nouns = ['Widget', 'Gadget', 'Device', 'Tool', 'Item'];",
+                  "const adj = adjectives[Math.floor(Math.random() * adjectives.length)];",
+                  "const noun = nouns[Math.floor(Math.random() * nouns.length)];",
+                  "pm.environment.set('randomProductName', `${adj} ${noun}`);",
+                  "console.log('Шинэ бүтээгдэхүүний нэр: ' + pm.environment.get('randomProductName'));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('Response < 2s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});",
+                  "",
+                  "pm.test('Шинэ id буцаасан', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('id');",
+                  "  pm.expect(d.id).to.be.a('number');",
+                  "  // Chain: шинэ id-г хадгалах",
+                  "  pm.environment.set('newProductId', d.id);",
+                  "});",
+                  "",
+                  "pm.test('Title буцаж ирсэн', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('title');",
+                  "  pm.expect(d.title).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Price зөв буцаасан', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.price).to.eql(29.99);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Product Title\",\n  \"price\": 49.99\n}"
+            },
+            "description": "Бүтээгдэхүүн шинэчлэнэ. Өөрчлөлт хадгалагдсаныг шалгана."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('Response < 1s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('Title шинэчлэгдсэн', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.title).to.eql('Updated Product Title');",
+                  "});",
+                  "",
+                  "pm.test('Price шинэчлэгдсэн (бизнес дүрэм)', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.price).to.eql(49.99);",
+                  "});",
+                  "",
+                  "pm.test('ID өөрчлөгдөөгүй', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.id).to.eql(parseInt(pm.environment.get('productId')));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE Product",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}"]
+            },
+            "description": "Бүтээгдэхүүн устгана. 200 + isDeleted: true буцаах ёстой."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('Response < 1s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('isDeleted: true байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('isDeleted');",
+                  "  pm.expect(d.isDeleted).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('deletedOn байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('deletedOn');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error Cases — Negative Tests",
+      "description": "4xx алдааны кейсүүд — contract шалгалт",
+      "item": [
+        {
+          "name": "GET Non-existent Product (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "999999"]
+            },
+            "description": "Байхгүй ID-тай product авахад 404 ирэх ёстой. Negative test."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test('Response < 1s', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('Error message байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('message');",
+                  "  pm.expect(d.message).to.be.a('string').and.have.length.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type нь JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Login — Буруу нууц үг (400/401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"wronguser\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "description": "Буруу нэвтрэх мэдээлэл явуулахад 400/401 ирэх ёстой. Negative test."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 эсвэл 401', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
+                  "});",
+                  "",
+                  "pm.test('Error message байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('message');",
+                  "});",
+                  "",
+                  "pm.test('Token буцаагаагүй', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.not.have.property('accessToken');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Auth/Me — Token байхгүй (401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] },
+            "description": "Token-гүйгээр protected endpoint руу хандахад 401 ирэх ёстой."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => { pm.response.to.have.status(401); });",
+                  "",
+                  "pm.test('Unauthorized message байна', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "https://dummyjson.com" },
+    { "key": "productId", "value": "1" }
+  ]
+}
