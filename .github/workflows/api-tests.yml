@@ -1,5 +1,10 @@
-name: API Tests — DummyJSON
-
+- name: Run Newman
+        run: |
+          newman run postman/collection.json \
+            -e postman/env.ci.json \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export reports/api.html \
+            --suppress-exit-code
 on:
   push:
     branches: [main, develop]
