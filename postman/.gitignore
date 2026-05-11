@@ -1,0 +1,14 @@
+# Dependency folders (Newman болон бусад library-нууд)
+node_modules/
+
+# Local environment variables (Нууц токен хадгалах файлууд)
+postman/env.dev.local.json
+*.local.json
+.env
+
+# Newman-аар үүсгэгдсэн тайлангууд (CI дээр өөрөө үүснэ)
+reports/*.html
+reports/*.xml
+
+# macOS-ийн систем файлууд
+.DS_Store
